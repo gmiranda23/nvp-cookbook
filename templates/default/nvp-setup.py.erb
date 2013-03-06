@@ -1,0 +1,353 @@
+#!/usr/bin/env python
+
+import pexpect
+import getpass, os
+import sys
+import cookielib
+import fcntl
+import json
+import re
+import socket
+import struct
+import subprocess
+import urllib
+import urllib2
+import urlparse
+
+class NVPAPIClient(object):
+    def __init__(self, cluster_ip):
+        self.base_url = 'https://%s/ws.v1/' % cluster_ip
+        self.opener = None
+
+    def _do_request(self, path, data={}, query_string={}, serializer='form', method='POST'):
+        assert self.opener is not None, 'You must successfully login first'
+
+        headers = {}
+
+        path = urlparse.urljoin(self.base_url, path)
+        if query_string:
+            path = '%s?%s' % (path, urllib.urlencode(query_string))
+
+        if data:
+            if serializer == 'json':
+                data = json.dumps(data)
+                headers['Content-Type'] = 'application/json; charset=utf-8'
+            else: # form
+                data = urllib.urlencode(data.items())
+        else:
+            data = None
+
+        try:
+	    requesttext = urllib2.Request(path, data, headers)
+	    requesttext.get_method = lambda: method
+            #response = self.opener.open(urllib2.Request(path, data, headers))
+            response = self.opener.open(requesttext)
+        except Exception, e:
+            raise Exception, 'API Error %s -- %s' % (e.code, e.read())
+        
+        if response.getcode() == 200:
+            if response.headers.gettype() == 'application/json':
+                return json.load(response)
+            else:
+                return response.read()
+
+    def login(self, username, password):
+        jar = cookielib.CookieJar()
+        self.opener = urllib2.build_opener(urllib2.HTTPRedirectHandler(),
+                urllib2.HTTPCookieProcessor(jar))
+        try:
+            credentials = dict(username=username, password=password)
+            self._do_request('login', credentials)
+        except Exception, e:
+            self.opener = None
+            raise e
+    def add_transport_zone(self, zone):
+	args = dict(
+	display_name=zone[:40],
+	tags=[])
+
+	response = self._do_request('transport-zone', args, serializer='json', method='POST')
+
+    def add_lswitch(self, name, zone):
+	tzone = dict(
+		zone_uuid=zone,
+		binding_config={},
+		transport_type='stt')
+		
+	
+	args = dict(
+		display_name=name,
+		transport_zones=[tzone],
+		type='LogicalSwitchConfig')
+	
+	response = self._do_request('lswitch', args, serializer='json', method='POST')
+
+    def add_lport(self, name, lsuuid):
+	args = dict(
+		display_name=name,
+		admin_status_enabled=True,
+		tags=[],
+		allowed_address_pairs=[])
+		
+		
+	response = self._do_request('lswitch/' + lsuuid + '/lport', args, serializer='json', method='POST')
+
+    def attach_lport(self, ls_uuid, lport_uuid, vif_uuid):
+	args = dict(
+		vif_uuid=vif_uuid,
+		type='VifAttachment')
+	
+		
+	response = self._do_request('lswitch/' + ls_uuid + '/lport/' + lport_uuid + '/attachment', args, serializer='json', method='PUT')
+	
+    def add_tn(self, name, zone, transport_ip, ttype, net):
+        credential = dict(
+            mgmt_address=transport_ip, 
+            type='MgmtAddrCredential')
+
+<% node['nvp']['sn'].each do |sn_name, sn_data| -%>
+        if net == <%= sn_data['id'] %>:
+            connector_ip = re.sub(r'<%= sn_data['sub1'] %>', '<%= sn_data['sub2'] %>', transport_ip)
+<% end -%>
+        
+	connector = dict(
+            ip_address=connector_ip,
+            transport_zone_uuid=zone,
+            type='STTConnector')
+        
+	if ttype == 'hv':
+		args = dict(
+            		admin_status_enabled=True,
+            		credential=credential,
+            		display_name=name[:40],
+			integration_bridge_id='br-int',
+            		tags=[],
+            		transport_connectors=[connector],
+            		zone_forwarding=False)
+	if ttype == 'sn':
+		args = dict(
+            		admin_status_enabled=True,
+            		credential=credential,
+            		display_name=name[:40],
+            		tags=[],
+            		transport_connectors=[connector],
+            		zone_forwarding=True)
+
+
+        response = self._do_request('transport-node', args, serializer='json', method='POST')
+
+
+    def transport_zone_uuid(self, name):
+        return self._object_lookup('transport-zone', display_name=name)
+
+    def lswitch_uuid(self, name):
+	return self._object_lookup('lswitch', display_name=name)
+
+    def lport_uuid(self, pname, lname):
+	return self._object_lookup('lswitch/' + lname + '/lport', display_name=pname)
+
+    def _object_lookup(self, otype,  **filters):
+        objects = self._do_request(otype, query_string=filters, method='GET')
+        count = objects.get('result_count', 0)
+        if count == 0 and filters:
+            msg = 'No object matching name found.'
+        else:
+            item = self._do_request(objects['results'][0]['_href'], method='GET')
+            return item['uuid']
+
+        sys.stderr.write(msg)
+	sys.stderr.write(otype)
+        sys.exit(1)
+
+
+def _interface_ip_address(ifname):
+    """
+    self contained way to determine interface IP address - works only on linux
+    NOTE: could use netinterfaces if we wanted to add dependency
+    """
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    info = fcntl.ioctl(s.fileno(), 0x8915, struct.pack('256s', ifname[:15]))
+    return socket.inet_ntoa(info[20:24])
+
+def _extract_certificate(path):
+    regex = r'(-----BEGIN CERTIFICATE-----\n.*?-----END CERTIFICATE-----)'
+    cert = re.search(regex, file(path).read(), re.M|re.S).group(1)
+    # always ensure cookie has a new line one the end
+    return cert.strip() + '\n'
+
+def _configure_manager(cluster_ip):
+    args = ['ovs-vsctl', 'set-manager', 'ssl:%s' % cluster_ip]
+    if os.getuid() != 0:
+        sys.stderr.write('You are not root! Please run this command:\n sudo %s'
+                % ' '.join(args))
+        sys.exit(1)
+
+def setupnode (user, password, host, hosttype, masterip, timeout):
+
+	ssh_newkey = 'Are you sure you want to continue connecting'
+	child = pexpect.spawn('ssh -l %s %s'%(user, host), timeout=timeout)
+	logfile = file(logdir + '/' + host + '.log', 'w')
+	child.logfile = logfile
+	i = child.expect([pexpect.TIMEOUT, ssh_newkey, 'password: '])
+	if i == 0: # Timeout
+	    print 'ERROR!'
+	    print 'SSH could not login. Here is what SSH said:'
+	    print child.before, child.after
+	if i == 1: # SSH does not have the public key. Just accept it.
+	    child.sendline ('yes')
+	    i = child.expect([pexpect.TIMEOUT, 'password:'])
+	    if i == 0: # Timeout
+	        print 'ERROR!!!'
+	        print 'SSH could not login. Here is what SSH said:'
+	        print child.before, child.after
+	child.sendline(password)
+	if hosttype == 'hv':
+		prompt = '[#$]'
+		child.expect(prompt)
+		child.sendline('sudo su -')
+		child.expect(': ')
+		child.sendline('nicira')
+		child.expect(prompt)
+		child.sendline('cd /etc/openvswitch')
+		child.expect(prompt)
+		child.sendline('ovs-pki init --force')
+		child.expect(prompt)
+		child.sendline('ovs-pki req+sign ovsclient controller')
+		child.expect(prompt)
+		child.sendline('ovs-vsctl -- --bootstrap set-ssl /etc/openvswitch/ovsclient-privkey.pem /etc/openvswitch/ovsclient-cert.pem /etc/openvswitch/controller-ca-cert.pem')
+		child.expect(prompt)
+		child.sendline('ovs-vsctl set-manager ssl:' + masterip)
+		child.expect(prompt)
+		child.sendline('ovs-vsctl add-br br-int')
+		child.expect(prompt)
+		child.sendline('ovs-vsctl br-set-external-id br-int bridge-id br-int')
+		child.expect(prompt)
+		child.sendline('ovs-vsctl set Bridge br-int other_config:disable-in-band=true -- set Bridge br-int fail_mode=secure')
+		child.expect(prompt)
+		child.sendline('cp /etc/network/interfaces.complete /etc/network/interfaces')
+		child.expect(prompt)
+		child.sendline('ifdown eth1')
+		child.expect(prompt)
+		child.sendline('ifup eth1')
+		child.expect(prompt)
+		child.sendline('cd /var/lib/libvirt/images/')
+		child.expect(prompt)
+		child.sendline('for vm in */*.xml ; do virsh define $vm ; done')
+		child.expect(prompt)
+		child.sendline('rm /etc/qemu-if*')
+		child.expect(prompt)
+		child.sendline('ln -s /etc/ovs-ifup-generic /etc/qemu-ifup')
+		child.expect(prompt)
+		child.sendline('ln -s /etc/ovs-ifdown-generic /etc/qemu-ifdown')
+		child.expect(prompt)
+		command = 'for vm in *; do virsh start $vm ; done'
+		child.sendline(command)
+		child.expect(prompt)
+		child.sendline('date')
+		child.expect(prompt)
+	else:
+		prompt = ' # '
+		child.expect(prompt)
+		child.sendline('add network default-route <%= node['nvp']['default-route'] %>')
+		exists = '(y/N)'
+		i = child.expect([pexpect.TIMEOUT, exists, prompt ])
+		if i == 1:
+			child.sendline('y')
+			child.expect(prompt)
+		child.sendline('add network dns-server 8.8.8.8')
+		child.expect(prompt)
+		child.sendline('add network ntp-server 0.pool.ntp.org')
+	if  hosttype == 'controller':
+		child.expect(prompt)
+		child.sendline('set control-cluster management-address ' + host ) 
+		child.expect(prompt)
+		child.sendline('set control-cluster role switch_manager listen-ip ' + host)
+		child.expect(prompt)
+		child.sendline('set control-cluster role api_provider listen-ip ' + host)
+ 		child.expect(prompt)
+		child.sendline('join control-cluster ' + masterip)
+ 		child.expect(prompt)
+		child.sendline('show control-cluster status')
+		child.expect(prompt)
+
+<% node['nvp']['sn'].each do |sn_name, sn_data| -%>
+	elif hosttype == '<%= sn_name %>':
+		hostip = re.sub(r'<%= sn_data['sub1'] %>', '<%= sn_data['sub2'] %>', host)
+		child.expect(prompt)
+		child.sendline('set network interface breth1 ip config static ' + hostip + ' 255.255.255.0')
+		child.expect(prompt)
+		child.sendline('add switch manager ' + masterip)
+		child.expect(prompt)
+		child.sendline('add network route 10.10.0.0 255.255.0.0 <%= sn_data['gateway'] %>')
+		child.expect(prompt)
+<% end -%>
+	else:
+		print "all done"
+
+if __name__ == '__main__':
+	# set some credentials
+	u = '<%= @user %>'
+	p = '<%= @pass %>'
+	nu = '<%= @hv_user %>'
+	np = '<%= @hv_pass %>'
+	# make a directory for logging.
+	logdir = '/tmp/clustersetup_logs' 
+	if not os.path.exists(logdir):
+		os.makedirs(logdir)
+
+	# let's setup the cluster 
+	timeout = <%= @timeout %>
+	controllers = <%= @controllers %>
+<% node['nvp']['controllers'].each do |n| -%>
+	setupnode(u, p, '<%= n %>', 'controller', controllers[0], timeout)
+<% end -%>
+
+	timeout = 30
+	# setup the SN's
+<% node['nvp']['sn'].each do |sn_name, sn_data | -%>
+	setupnode(u, p, '<%= sn_data['ip'] %>', '<%= sn_name %>', controllers[0], timeout)
+<% end -%>
+
+	#setup the HV's
+<% node['nvp']['hvs'].each do |h| -%>
+	setupnode(nu, np, '<%= h %>', 'hv', controllers[0], timeout)
+<% end -%>
+
+	# now for some fun stuff...
+	zonename = 'TZ'
+	connection = NVPAPIClient(controllers[0])
+	connection.login(u, p)
+	#create a zone 
+	connection.add_transport_zone(zonename)
+
+	#start mapping the nodes in to the zone..
+	transport_uuid = connection.transport_zone_uuid(zonename)
+	#setup sn
+<% node['nvp']['sn'].each do |sn_name, sn_data| -%>
+	connection.add_tn('<%= sn_name %>', transport_uuid, '<%= sn_data['ip'] %>', 'sn', <%= sn_data['id'] %>)
+<% end -%>
+  #setup hv
+	connection.add_tn('HV1', transport_uuid, '10.127.1.2', 'hv', 11)
+	connection.add_tn('HV2', transport_uuid, '10.127.1.3', 'hv', 21)
+	# G'S NOTE: WHY IS ONE 11 AND THE OTHER 21??
+
+	# let's wire the switches and ports
+<% node['nvp']['tenants'].each do |tenant, tenant_data| -%>
+	tname='<%= tenant_data['name'] %>'
+  <% tenant_data['vms'].each do |vm| %>
+	VM='Tenant<%= tenant %>-<%= vm %>'	
+	vif='tenant<%= tenant %>-<%= vm %>-<%= tenant_data['vif'] %>'
+	connection.add_lswitch(tname, transport_uuid)
+	lsuuid = connection.lswitch_uuid(tname)
+	connection.add_lport(VM, lsuuid )
+	lpuuid = connection.lport_uuid(VM, lsuuid )
+	connection.attach_lport(lsuuid, lpuuid, vif)
+  <% end -%>
+<% end -%>
+
+#	connectionmdi = NVPAPIClient(mdi)
+#	connectionmdi.login(u, p)
+#	connectionmdi.add_transport_zone(zonename)
+#	transport_uuid = connectionmdi.transport_zone_uuid(zonename)
+#	connectionmdi.add_tn('SN', transport_uuid, '10.127.1.6', 'sn', 21)
+#	connectionmdi.add_tn('HV3', transport_uuid, '10.127.1.102', 'hv', 21)

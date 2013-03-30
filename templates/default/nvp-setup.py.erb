@@ -109,6 +109,8 @@ class NVPAPIClient(object):
         if net == <%= sn_data['id'] %>:
             connector_ip = re.sub(r'<%= sn_data['sub1'] %>', '<%= sn_data['sub2'] %>', transport_ip)
 <% end -%>
+	else:
+	    connector_ip = transport_ip
         
 	connector = dict(
             ip_address=connector_ip,
@@ -351,3 +353,8 @@ if __name__ == '__main__':
 #	transport_uuid = connectionmdi.transport_zone_uuid(zonename)
 #	connectionmdi.add_tn('SN', transport_uuid, '10.127.1.6', 'sn', 21)
 #	connectionmdi.add_tn('HV3', transport_uuid, '10.127.1.102', 'hv', 21)
+
+#Tell Chef we're done
+flag = open("/opt/nicira/.nvp-setup-complete", "w")
+flag.write("all completed")
+flag.close()

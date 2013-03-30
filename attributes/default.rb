@@ -18,31 +18,31 @@
 #
 
 # Nicira Controller Settings
-default['nvp']['controllers'] = [ "10.127.1.10", "10.127.1.11", "10.127.1.12" ]
+default['nvp']['controllers'] = [ "10.127.1.101" ]
 default['nvp']['user'] = "admin"
 default['nvp']['pass'] = "admin"
 default['nvp']['timeout'] = 100
 default['nvp']['default-route'] = "10.127.1.1"
 
 # Service Nodes
-default['nvp']['sn']['sn11']['ip'] = "10.127.1.5"
+default['nvp']['sn']['sn11']['ip'] = "10.127.1.102"
 default['nvp']['sn']['sn11']['id'] = "11"
 default['nvp']['sn']['sn11']['gateway'] = "10.10.1.1"
 default['nvp']['sn']['sn11']['controller'] = "#{nvp['controllers'].first}"
 default['nvp']['sn']['sn11']['sub1'] = "10.127"
 default['nvp']['sn']['sn11']['sub2'] = "10.10"
 
-default['nvp']['sn']['sn21']['ip'] = "10.127.1.6"
-default['nvp']['sn']['sn21']['id'] = "21"
-default['nvp']['sn']['sn11']['gateway'] = "10.10.2.1"
-default['nvp']['sn']['sn21']['controller'] = "#{nvp['controllers'].first}"
-default['nvp']['sn']['sn21']['sub1'] = "10.127.1"
-default['nvp']['sn']['sn21']['sub2'] = "10.10.1"
+#default['nvp']['sn']['sn21']['ip'] = "10.127.1.102"
+#default['nvp']['sn']['sn21']['id'] = "21"
+#default['nvp']['sn']['sn11']['gateway'] = "10.10.2.1"
+#default['nvp']['sn']['sn21']['controller'] = "#{nvp['controllers'].first}"
+#default['nvp']['sn']['sn21']['sub1'] = "10.127.0"
+#default['nvp']['sn']['sn21']['sub2'] = "10.10.1"
 
 # Hypervisors
 default['nvp']['hvs'] = [ "10.127.1.2", "10.127.1.3" ]
-default['nvp']['hv_user'] = "nicira"
-default['nvp']['hv_pass'] = "nicira"
+default['nvp']['hv_user'] = "root"
+default['nvp']['hv_pass'] = "!cisco"
 
 # the "fun stuff"
 default['nvp']['zonename'] = "TZ"

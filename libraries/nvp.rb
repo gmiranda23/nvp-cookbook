@@ -3,7 +3,7 @@ class Chef::Recipe::NVP
   def self.error
     puts "================================================================================"
     puts "Recipe Requirement Error - Nicira OpenVswitch packages not found"
-    puts "To fix this error, place Nicira OpenVswitch packages in #{node["nvp"]["ovs"]["pkg_path"]}"
+    puts "To fix this error, place Nicira OpenVswitch packages in #{node['nvp']['ovs']['pkg_path']}"
     puts "================================================================================"
   end
 

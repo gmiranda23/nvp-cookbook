@@ -304,7 +304,6 @@ if __name__ == '__main__':
 	setupnode(u, p, '<%= n %>', 'controller', controllers[0], timeout)
 <% end -%>
 
-	timeout = 30
 	# setup the SN's
 <% node['nvp']['sn'].each do |sn_name, sn_data | -%>
 	setupnode(u, p, '<%= sn_data['ip'] %>', '<%= sn_name %>', controllers[0], timeout)

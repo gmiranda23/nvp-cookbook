@@ -17,7 +17,7 @@
 # limitations under the License.
 #
 
-#include_recipe "nvp::ovs"
+include_recipe "nvp::ovs"
 
 package "python"
 package "python-pexpect"

@@ -17,6 +17,9 @@
 # limitations under the License.
 #
 
+#Nicira Packages for OVS
+default['nvp']['ovs']['pkg_path'] = "/tmp"
+
 # Nicira Controller Settings
 default['nvp']['controllers'] = [ "10.127.1.101" ]
 default['nvp']['user'] = "admin"

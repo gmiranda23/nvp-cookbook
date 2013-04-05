@@ -25,8 +25,10 @@
 # Check packages are present or exit the run
 %w{openvswitch-common openvswitch-datapath-dkms openvswitch-pki openvswitch-switch}.each do |pkg|
   NVP.checkpkg("#{node['nvp']['ovs']['pkg_path']}/#{pkg}")
+  file = Dir.glob("#{node['nvp']['ovs']['pkg_path']}/#{pkg}*.deb")
 
   package pkg do
     action :install
+    source "#{file}"
   end
 end

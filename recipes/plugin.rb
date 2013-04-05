@@ -18,3 +18,33 @@
 #
 
 include_recipe "nvp::ovs"
+
+package "python"
+package "python-pexpect"
+
+directory "/opt/nicira/" do
+  recursive true
+  mode "0755"
+  user "root"
+  group "root"
+end
+
+template "/opt/nicira/nvp-setup.py" do
+  source "nvp-setup.py.erb"
+  owner "root"
+  group "root"
+  mode "0750"
+  variables(
+    :user => node['nvp']['user'],
+    :pass => node['nvp']['pass'],
+    :hv_user => node['nvp']['hv_user'],
+    :hv_pass => node['nvp']['hv_pass'],
+    :timeout => node['nvp']['timeout'],
+    :controllers => node['nvp']['controllers']
+  )
+end
+
+execute "/opt/nicira/nvp-setup.py" do
+  cwd "/opt/nicira/"
+  creates "/opt/nicira/.nvp-setup-complete"
+end

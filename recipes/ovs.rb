@@ -17,13 +17,15 @@
 # limitations under the License.
 #
 
-# Nicira distributes private packages for NVP to its customers.
+# Nicira distributes private OVS packages for NVP to its customers.
 # Since these aren't in a repo, they must be on the Nova Controller
-# prior to kicking off a chef-client run to configure NVP.
-# Check packages are present or exit early in the run
+# prior to kicking off a chef-client run to configure NVP.  These
+# must also be installed on OpenStack Computer nodes.
+#
+# Check packages are present or exit the run
 %w{openvswitch-common openvswitch-datapath-dkms openvswitch-pki openvswitch-switch}.each do |pkg|
   NVP.checkpkg("#{node['nvp']['ovs']['pkg_path']}/#{pkg}")
-  
+
   package pkg do
     action :install
   end

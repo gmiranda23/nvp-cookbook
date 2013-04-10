@@ -15,7 +15,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
+
+# Install deps apt would resolve
+package "libssl0.9.8"
 
 # Nicira distributes private OVS packages for NVP to its customers.
 # Since these aren't in a repo, they must be on the Nova Controller
@@ -25,10 +27,10 @@
 # Check packages are present or exit the run
 %w{openvswitch-common openvswitch-datapath-dkms openvswitch-pki openvswitch-switch}.each do |pkg|
   NVP.checkpkg("#{node['nvp']['ovs']['pkg_path']}/#{pkg}")
-  file = Dir.glob("#{node['nvp']['ovs']['pkg_path']}/#{pkg}*.deb")
+  file = Dir.glob("#{node['nvp']['ovs']['pkg_path']}/#{pkg}*.deb").join
 
-  package pkg do
+  dpkg_package pkg do
     action :install
-    source "#{file}"
+    source file
   end
 end

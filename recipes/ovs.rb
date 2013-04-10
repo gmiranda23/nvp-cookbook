@@ -24,7 +24,7 @@ package "libssl0.9.8"
 # prior to kicking off a chef-client run to configure NVP.  These
 # must also be installed on OpenStack Computer nodes.
 
-%w(openvswitch-common_1.7.0.15247_amd64.deb openvswitch-datapath-dkms_1.7.0.15247_all.deb openvswitch-pki_1.7.0.15247_all.deb openvswitch-switch_1.7.0.15247_amd64.deb).each do |pkg|
+node['nvp']['ovs']['pkgs'].each do |pkg|
 
   cookbook_file "#{Chef::Config[:file_cache_path]}/#{pkg}" do
     source pkg

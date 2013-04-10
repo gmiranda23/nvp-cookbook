@@ -18,7 +18,7 @@
 #
 
 #Nicira Packages for OVS
-default['nvp']['ovs']['pkg_path'] = "/tmp"
+default['nvp']['ovs']['pkgs'] = [ "openvswitch-common_1.7.0.15247_amd64.deb", "openvswitch-datapath-dkms_1.7.0.15247_all.deb" "openvswitch-pki_1.7.0.15247_all.deb", "openvswitch-switch_1.7.0.15247_amd64.deb" ]
 
 # Nicira Controller Settings
 default['nvp']['controllers'] = [ "10.127.1.101" ]

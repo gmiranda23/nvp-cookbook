@@ -23,14 +23,24 @@ package "libssl0.9.8"
 # Since these aren't in a repo, they must be on the Nova Controller
 # prior to kicking off a chef-client run to configure NVP.  These
 # must also be installed on OpenStack Computer nodes.
-#
-# Check packages are present or exit the run
-%w{openvswitch-common openvswitch-datapath-dkms openvswitch-pki openvswitch-switch}.each do |pkg|
-  NVP.checkpkg("#{node['nvp']['ovs']['pkg_path']}/#{pkg}")
-  file = Dir.glob("#{node['nvp']['ovs']['pkg_path']}/#{pkg}*.deb").join
+
+%w(openvswitch-common_1.7.0.15247_amd64.deb openvswitch-datapath-dkms_1.7.0.15247_all.deb openvswitch-pki_1.7.0.15247_all.deb openvswitch-switch_1.7.0.15247_amd64.deb).each do |pkg|
+
+  cookbook_file "#{Chef::Config[:file_cache_path]}/#{pkg}" do
+    source pkg
+    owner "root"
+    group "root"
+    mode "0644"
+  end
+
+  ruby_block "check if #{pkg} is non-zero" do
+    block do
+      Chef::Application.fatal!("Zero file size for #{pkg}. Upload a valid package in your 'nvp' cookbook files directory")
+    end
+    only_if { File.stat("#{Chef::Config[:file_cache_path]}/#{pkg}").zero? }
+  end
 
   dpkg_package pkg do
-    action :install
-    source file
+  source "#{Chef::Config[:file_cache_path]}/#{pkg}"
   end
 end

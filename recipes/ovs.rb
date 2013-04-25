@@ -17,10 +17,9 @@
 # limitations under the License.
 
 # Install deps apt would resolve
-package "libssl0.9.8"
-package "gcc"
-package "build-essential"
-package "dkms"
+%w{libssl0.9.8 gcc build-essential dkms}.each do |prereq|
+package prereq
+end
 
 # Nicira distributes private OVS packages for NVP to its customers.
 # Since these aren't in a repo, they must be on the Nova Controller

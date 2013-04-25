@@ -31,14 +31,14 @@ default['nvp']['default-route'] = "10.127.1.1"
 default['nvp']['sn']['sn11']['ip'] = "10.127.1.102"
 default['nvp']['sn']['sn11']['id'] = "11"
 default['nvp']['sn']['sn11']['gateway'] = "10.10.1.1"
-default['nvp']['sn']['sn11']['controller'] = "#{nvp['controllers'].first}"
+default['nvp']['sn']['sn11']['controller'] = node['nvp']['controllers'].first
 default['nvp']['sn']['sn11']['sub1'] = "10.127"
 default['nvp']['sn']['sn11']['sub2'] = "10.10"
 
 #default['nvp']['sn']['sn21']['ip'] = "10.127.1.102"
 #default['nvp']['sn']['sn21']['id'] = "21"
 #default['nvp']['sn']['sn11']['gateway'] = "10.10.2.1"
-#default['nvp']['sn']['sn21']['controller'] = "#{nvp['controllers'].first}"
+#default['nvp']['sn']['sn21']['controller'] = node['nvp']['controllers'].first
 #default['nvp']['sn']['sn21']['sub1'] = "10.127.0"
 #default['nvp']['sn']['sn21']['sub2'] = "10.10.1"
 
@@ -49,7 +49,7 @@ default['nvp']['hv_pass'] = "!cisco"
 
 # the "fun stuff"
 default['nvp']['zonename'] = "TZ"
-default['nvp']['nvp_api_client_endpoint'] = "#{nvp['controllers'].first}"
+default['nvp']['nvp_api_client_endpoint'] = node['nvp']['controllers'].first
 
 default['nvp']['tenants']['a']['name'] = "TenantA"
 default['nvp']['tenants']['a']['vif'] = "eth0"
